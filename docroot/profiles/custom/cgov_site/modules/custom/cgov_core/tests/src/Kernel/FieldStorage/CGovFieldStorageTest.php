@@ -20,7 +20,7 @@ class CGovFieldStorageTest extends KernelTestBase {
    */
   public static $modules = [
     'user', 'system', 'file', 'field', 'node', 'text', 'filter', 'datetime', 'options', 'workflows', 'content_moderation',
-    'language', 'content_translation', 'cgov_core',
+    'language', 'content_translation', 'cgov_core', 'taxonomy',
   ];
 
   /**
@@ -88,16 +88,6 @@ class CGovFieldStorageTest extends KernelTestBase {
       "name" => "field_search_engine_restrictions",
       "label" => "Search Engine Restrictions",
       "type" => "list_string",
-    ],
-    [
-      "name" => "field_syndicate",
-      "label" => "Syndicate",
-      "type" => "boolean",
-    ],
-    [
-      "name" => "field_syndication_keywords",
-      "label" => "Syndication Keywords",
-      "type" => "plain_text",
     ],
   ];
 
