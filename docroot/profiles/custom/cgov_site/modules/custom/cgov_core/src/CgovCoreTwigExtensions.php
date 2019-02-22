@@ -2,10 +2,26 @@
 
 namespace Drupal\cgov_core;
 
+use Drupal\Core\Entity\EntityTypeManagerInterface;
+
 /**
  * Extend Drupal's Twig_Extension class.
  */
 class CgovCoreTwigExtensions extends \Twig_Extension {
+
+  /**
+   * Entity Type Manager.
+   *
+   * @var \Drupal\Core\Entity\EntityTypeManagerInterface
+   */
+  protected $entityTypeManager;
+
+  /**
+   * Constructs a new CgovNavigationManager class.
+   */
+  public function __construct(EntityTypeManagerInterface $entityTypeManager) {
+    $this->entityTypeManager = $entityTypeManager;
+  }
 
   /**
    * {@inheritdoc}
@@ -19,12 +35,14 @@ class CgovCoreTwigExtensions extends \Twig_Extension {
    */
   public function getFunctions() {
     return [
-      new \Twig_SimpleFunction('get_enclosure', [$this, 'getEnclosure']),
+      new \Twig_SimpleFunction('get_enclosure', [$this, 'getEnclosure'], ['is_safe' => ['html']]),
     ];
   }
 
   /**
    * Generate <enclosure url='x' length='9' type='mime/type' /> tag from NID.
+   *
+   * Call this function with {{ get_enclosure(node.nid)|raw }}
    *
    * @param int $nid
    *   Node ID to create enclosure tag from.
@@ -33,7 +51,22 @@ class CgovCoreTwigExtensions extends \Twig_Extension {
    *   generated enclosure tag.
    */
   public function getEnclosure($nid) {
-    return "<enclosure url='$nid' length='9' type='mime/type' />";
+    $node = $this->entityTypeManager->getStorage('node')->load($nid);
+    if (!$node) {
+      return FALSE;
+    }
+
+    $media_field = $node->get('field_image_article')->entity;
+    $media_image_file = $media_field->get('field_media_image')->entity;
+    $file_mime_type = $media_image_file->getMimeType();
+    $file_size = $media_image_file->getSize();
+
+    $image_uri = $media_image_file->uri->value;
+    $image_url = file_create_url($image_uri);
+
+    $enclosure = "<enclosure url='$image_url' length='$file_size' type='$file_mime_type' />";
+
+    return $enclosure;
   }
 
 }

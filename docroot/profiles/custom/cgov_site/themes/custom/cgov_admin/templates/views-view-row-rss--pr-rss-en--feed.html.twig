@@ -18,7 +18,7 @@
 <item>
   <title>{{ title }}</title>
   <link>{{ link }}</link>
-  {{ get_enclosure(row.nid)|raw }}
+  {{ get_enclosure(row.nid) }}
   <description>{{ description }}</description>
   {% for item in item_elements -%}
   <{{ item.key }}{{ item.attributes -}}
