@@ -134,14 +134,14 @@ class PDQResource extends ResourceBase {
           'posted_date' => $translation->field_date_posted->value,
           'updated_date' => $translation->field_date_updated->value,
           'short_title' => $translation->field_short_title->value,
-          'description' => $translation->field_list_description->value,
+          'description' => $translation->field_page_description->value,
 
           // This field will probably not be retained for the intitial
           // release.
           // 'keywords' => $translation->field_syndication_keywords->value,
           // End of suppressed field.
           'public_use' => $translation->field_public_use->value,
-          'url' => $translation->path->alias,
+          'url' => $translation->field_pdq_url->value,
           'published' => $translation->status->value,
           'sections' => $sections,
         ];
@@ -238,16 +238,16 @@ class PDQResource extends ResourceBase {
     $today = date('Y-m-d');
     $node->setTitle(($summary['title']));
     $node->setOwnerId($this->currentUser->id());
-    $node->set('path', ['alias' => $summary['url']]);
+    $node->set('field_pdq_url', $summary['url']);
     $node->set('field_pdq_cdr_id', $summary['cdr_id']);
     $node->set('field_pdq_audience', $summary['audience']);
     $node->set('field_pdq_summary_type', $summary['summary_type']);
     $node->set('field_date_posted', $summary['posted_date'] ?? $today);
     $node->set('field_date_updated', $summary['updated_date'] ?? $today);
     $node->set('field_short_title', $summary['short_title']);
-    $node->set('field_list_description', $summary['description']);
+    $node->set('field_page_description', $summary['description']);
 
-    // Field suppresse for now.
+    // Field suppressed for now.
     // $node->set('field_syndication_keywords', $summary['keywords']);
     // End of suppressed field.
     $node->set('field_summary_sections', $sections);
@@ -257,6 +257,7 @@ class PDQResource extends ResourceBase {
     // summaries published in a separate pass after they've all been
     // stored, in order to minimize the window of time during which
     // older versions exist alongside newer.
+    $node->moderation_state->value = 'draft';
     $node->save();
     $verb = empty($nid) ? 'Created' : 'Updated';
     $code = empty($nid) ? 201 : 200;

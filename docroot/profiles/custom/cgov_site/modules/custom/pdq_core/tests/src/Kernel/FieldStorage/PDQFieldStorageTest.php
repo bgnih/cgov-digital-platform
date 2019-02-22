@@ -19,7 +19,7 @@ class PDQFieldStorageTest extends KernelTestBase {
    * @var array
    */
   public static $modules = [
-    'user', 'system', 'file', 'field', 'node', 'text', 'filter', 'datetime', 'options', 'workflows', 'content_moderation',
+    'user', 'system', 'file', 'field', 'image', 'node', 'text', 'filter', 'datetime', 'options', 'workflows', 'content_moderation',
     'language', 'content_translation', 'pdq_core', 'paragraphs', 'rest', 'serialization',
   ];
 
@@ -32,12 +32,17 @@ class PDQFieldStorageTest extends KernelTestBase {
     [
       "name" => "field_pdq_cdr_id",
       "label" => "CDR ID",
-      "type" => "plain_text",
+      "type" => "integer",
     ],
     [
       "name" => "field_pdq_audience",
       "label" => "Audience",
       "type" => "list_string",
+    ],
+    [
+      "name" => "field_pdq_url",
+      "label" => "PDQ Summary URL",
+      "type" => "string",
     ],
   ];
 
@@ -86,6 +91,8 @@ class PDQFieldStorageTest extends KernelTestBase {
         case "formatted_text":
         case "datetime":
         case "list_string":
+        case "string":
+        case "integer":
           $this->addFieldByName($type, $fieldToTest["name"], $fieldToTest["label"]);
           break;
       }
@@ -95,6 +102,7 @@ class PDQFieldStorageTest extends KernelTestBase {
 
     // Test the field persistance when it has been removed from all nodes.
     foreach ($this->fieldsToTest as $fieldToTest) {
+
       // Remove from our content type.
       $field = FieldConfig::loadByName('node', 'ponies', $fieldToTest["name"]);
       $field->delete();
