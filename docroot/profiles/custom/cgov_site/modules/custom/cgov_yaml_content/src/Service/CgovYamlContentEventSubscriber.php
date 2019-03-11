@@ -4,12 +4,19 @@ namespace Drupal\cgov_yaml_content\Service;
 
 use Drupal\yaml_content\Event\YamlContentEvents;
 use Drupal\yaml_content\Event\EntityPostSaveEvent;
+use Drupal\yaml_content\Event\EntityPreSaveEvent;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Drupal\block\Entity\Block;
 use Drupal\paragraphs\Entity\Paragraph;
 use Drupal\Core\Theme\ThemeManagerInterface;
 use Drupal\Core\Entity\Query\QueryFactory;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Component\EventDispatcher\ContainerAwareEventDispatcher;
+use Drupal\Component\Render\PlainTextOutput;
+use Drupal\Core\Utility\Token;
+use Drupal\Core\TypedData\Exception\MissingDataException;
+use Drupal\file\Plugin\Field\FieldType\FileFieldItemList;
+use Drupal\Core\Entity\EntityInterface;
 
 /**
  * Handle yaml_content custom events.
@@ -38,6 +45,27 @@ class CgovYamlContentEventSubscriber implements EventSubscriberInterface {
   protected $entityTypeManager;
 
   /**
+   * Drupal token service.
+   *
+   * @var \Drupal\Core\Utility\Token
+   */
+  protected $token;
+
+  /**
+   * Drupal Event Dispatcher.
+   *
+   * @var \Drupal\Component\EventDispatcher\ContainerAwareEventDispatcher
+   */
+  protected $eventDispatcher;
+
+  /**
+   * IWC Manager for managing crops.
+   *
+   * @var \Drupal\image_widget_crop\ImageWidgetCropManager
+   */
+  protected $cropManager;
+
+  /**
    * Create new Event Subscriber class.
    *
    * @param \Drupal\Core\Theme\ThemeManagerInterface $themeManager
@@ -46,15 +74,23 @@ class CgovYamlContentEventSubscriber implements EventSubscriberInterface {
    *   Query factory.
    * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entityTypeManager
    *   Drupal Entity Type Manager.
+   * @param \Drupal\Core\Utility\Token $token
+   *   Drupal token service.
+   * @param \Drupal\Component\EventDispatcher\ContainerAwareEventDispatcher $dispatcher
+   *   Drupal Event Dispatcher.
    */
   public function __construct(
     ThemeManagerInterface $themeManager,
     QueryFactory $entityQueryFactory,
-    EntityTypeManagerInterface $entityTypeManager
+    EntityTypeManagerInterface $entityTypeManager,
+    Token $token,
+    ContainerAwareEventDispatcher $dispatcher
     ) {
     $this->themeManager = $themeManager;
     $this->entityQueryFactory = $entityQueryFactory;
     $this->entityTypeManager = $entityTypeManager;
+    $this->token = $token;
+    $this->eventDispatcher = $dispatcher;
   }
 
   /**
@@ -62,6 +98,7 @@ class CgovYamlContentEventSubscriber implements EventSubscriberInterface {
    */
   public static function getSubscribedEvents() {
     $events = [];
+    $events[YamlContentEvents::ENTITY_PRE_SAVE][] = ['addFileToCrop'];
     $events[YamlContentEvents::ENTITY_POST_SAVE][] = ['addSpanishTranslations'];
     $events[YamlContentEvents::ENTITY_POST_SAVE][] = ['addToRegion'];
     $events[YamlContentEvents::ENTITY_POST_SAVE][] = ['handlePostSaveEvents'];
@@ -166,15 +203,74 @@ class CgovYamlContentEventSubscriber implements EventSubscriberInterface {
       $query->condition($property, $value);
     }
     $entity_ids = $query->execute();
-    if (count($entity_ids) > 0) {
-      $first_id = array_shift($entity_ids);
-      $fieldReferenceArray = ['target_id' => $first_id];
+
+    // Reference entity can't be found. Create it.
+    if (empty($entity_ids)) {
+      $entity = $this->entityTypeManager->getStorage($entity_type)->create($args);
+      $entity_ids = [$entity->id()];
+    }
+
+    // Creating it failed.
+    if (empty($entity_ids)) {
+      return $this->throwParamError('Unable to process reference. Reference not found.', $entity_type);
+    }
+
+    $first_id = array_shift($entity_ids);
+    $fieldReferenceArray = ['target_id' => $first_id];
+    return $fieldReferenceArray;
+  }
+
+  /**
+   * Handle #process file directives.
+   *
+   * @param array $processConfig
+   *   Config.
+   * @param \Drupal\file\Plugin\Field\FieldType\FileFieldItemList $field
+   *   Field.
+   */
+  public function processFile(array $processConfig, FileFieldItemList $field) {
+    var_dump(get_class($field));
+    $entity_type = $processConfig['#process']['args'][0];
+    $filename = $processConfig['#process']['args'][1]['filename'];
+    unset($processConfig['#process']);
+    // After unsetting the #process config, we should be
+    // left with anything intended for the field, such as alt
+    // tags.
+    $path = drupal_get_path('module', 'cgov_yaml_content');
+    $directory = '/data_files/';
+    // If the entity type is an image, look in to the /images directory.
+    if ($entity_type == 'image') {
+      $directory = '/images/';
+    }
+    $fileData = file_get_contents($path . $directory . $filename);
+    $fileExists = $fileData !== FALSE;
+    if ($fileExists) {
+      $destination = 'public://';
+      // Look-up the field's directory configuration.
+      // Returns a token pattern.
+      $directory = $field->getSetting('file_directory');
+      if ($directory) {
+        $directory = trim($directory, '/');
+        $directory = PlainTextOutput::renderFromHtml($this->token->replace($directory));
+        if ($directory) {
+          $destination .= $directory . '/';
+        }
+      }
+
+      // Create the destination directory if it does not already exist.
+      file_prepare_directory($destination, FILE_CREATE_DIRECTORY);
+
+      // Save the file data or return an existing file.
+      $file = file_save_data($fileData, $destination . $filename, FILE_EXISTS_REPLACE);
+
+      // Use the newly created file id as the value.
+      $processConfig['target_id'] = $file->id();
+      return $processConfig;
     }
     else {
-      // Reference can't be found.
-      // TODO: Create thing instead?
+      return $this->throwParamError('Unable to process file content. File not found.', $entity_type);
     }
-    return $fieldReferenceArray;
+
   }
 
   /**
@@ -182,11 +278,13 @@ class CgovYamlContentEventSubscriber implements EventSubscriberInterface {
    *
    * @param array|string $fields
    *   Entity/Field data as array.
+   * @param \Drupal\Core\Entity\EntityInterface $entity
+   *   Entity.
    *
    * @return array
    *   Processed fields.
    */
-  public function handleProcessDirectives($fields) {
+  public function handleProcessDirectives($fields, EntityInterface $entity) {
     foreach ($fields as $fieldName => $fieldData) {
       // Test for process directives:
       // Process directives are associative arrays with
@@ -211,13 +309,14 @@ class CgovYamlContentEventSubscriber implements EventSubscriberInterface {
               $processedFieldContents[] = $processedReference;
             }
             elseif ((isset($value['#process']['callback']) && $value['#process']['callback'] === 'file')) {
-              // TODO: Handle file process directives. Until then, avoid errors
-              // by skipping the translated field altogether.
+              $field = $entity->get($fieldName);
+              $processedReference = $this->processFile($value, $field);
+              $processedFieldContents[] = $processedReference;
             }
             else {
               // You made a mistake formatting your process directive. Ha ha.
               // Go directly to jail, do not pass go.
-              // TODO: Throw, when exception handling gets added in.
+              return $this->throwParamError('Unable to process file content. Process callback not file or reference.', "", $value);
             }
           }
           else {
@@ -236,6 +335,54 @@ class CgovYamlContentEventSubscriber implements EventSubscriberInterface {
       }
     }
     return $fields;
+  }
+
+  /**
+   * Add ID and UI to crop structure in images.
+   *
+   * File crops require the ID and URI of the loaded file which is
+   * created in the "process" directives. This will find all those
+   * structures and add it in.
+   *
+   * @param \Drupal\yaml_content\Event\EntityPreSaveEvent $event
+   *   The event fired before the entity is saved.
+   */
+  public function addFileToCrop(EntityPreSaveEvent $event) {
+    $entity = $event->getEntity();
+
+    if ($entity->bundle() != 'cgov_image') {
+      return;
+    }
+
+    $img_field = $entity->field_media_image[0];
+    if ($img_field != NULL) {
+
+      // If we have crop info, then set file id.
+      if ($img_field->image_crop != NULL) {
+
+        // Pluck off the image crop information from the field
+        // as it does not get persisted anyway.
+        $image_crop = $img_field->image_crop;
+        $img_field->image_crop = NULL;
+
+        // Get the File entity.
+        $file_id = $img_field->target_id;
+        $fileStorage = $this->entityTypeManager->getStorage('file');
+        $file = $fileStorage->load($file_id);
+
+        // If for some reason there is no file, get out.
+        if ($file == NULL) {
+          return;
+        }
+
+        // Add the necessary file info to the crop data.
+        $image_crop['file-id'] = $file_id;
+        $image_crop['file-uri'] = $file->getFileUri();
+
+        // Add the crop information back in now that we know is good.
+        $img_field->image_crop = $image_crop;
+      }
+    }
   }
 
   /**
@@ -313,7 +460,7 @@ class CgovYamlContentEventSubscriber implements EventSubscriberInterface {
     // as callbacks in the yml.
     // Translated fields also doing that don't have access to this feature
     // so we are going to recreate the functionality on an as-needed basis.
-    $translatedFields = $this->handleProcessDirectives($translatedFields);
+    $translatedFields = $this->handleProcessDirectives($translatedFields, $entity);
 
     // 4. Create translation.
     $spanishTranslationAlreadyExists = $entity->hasTranslation('es');
@@ -328,6 +475,12 @@ class CgovYamlContentEventSubscriber implements EventSubscriberInterface {
       $spanishTranslation->{$fieldName} = $fieldValue;
     }
     $spanishTranslation->{'moderation_state'} = $entity->{'moderation_state'};
+
+    // Raise the preSave event so that other subscribers can modify
+    // the entity before saving.
+    $entity_pre_save_event = new EntityPreSaveEvent($event->getContentLoader(), $spanishTranslation, $yamlContent);
+    $this->eventDispatcher->dispatch(YamlContentEvents::ENTITY_PRE_SAVE, $entity_pre_save_event);
+
     // We need to discreetly save the translation to trigger pathauto
     // url alias building.
     $spanishTranslation->save();
@@ -452,6 +605,31 @@ class CgovYamlContentEventSubscriber implements EventSubscriberInterface {
     ];
     $siteSection->set('field_landing_page', $savedEntityReference);
     $siteSection->save();
+  }
+
+  /**
+   * Prepare an error message and throw error.
+   *
+   * @param string $error_message
+   *   The error message to display.
+   * @param string $entity_type
+   *   The entity type.
+   * @param array $filter_params
+   *   The filters for the query conditions.
+   */
+  protected function throwParamError($error_message, $entity_type = "ENTITY TYPE UNKNOWN", array $filter_params = []) {
+    // Build parameter output description for error message.
+    $error_params = [
+      '[',
+      '  "entity_type" => ' . $entity_type . ',',
+    ];
+    foreach ($filter_params as $key => $value) {
+      $error_params[] = sprintf("  '%s' => '%s',", $key, $value);
+    }
+    $error_params[] = ']';
+    $param_output = implode("\n", $error_params);
+
+    throw new MissingDataException(__CLASS__ . ': ' . $error_message . ': ' . $param_output);
   }
 
 }

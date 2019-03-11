@@ -213,7 +213,8 @@ class NavItem {
    */
   public function getMegamenuContent() {
     $megamenuFieldEntityReference = $this->term->field_mega_menu_content;
-    $hasMegamenu = !$megamenuFieldEntityReference->isEmpty();
+    $referencedEntities = $megamenuFieldEntityReference->referencedEntities();
+    $hasMegamenu = count($referencedEntities) > 0;
     if ($hasMegamenu) {
       $megamenuMarkupEncoded = $megamenuFieldEntityReference->entity->get('body')->value;
       $megamenuMarkupDecoded = Html::decodeEntities($megamenuMarkupEncoded);
@@ -270,6 +271,20 @@ class NavItem {
    */
   public function isCurrentSiteSection() {
     return $this->navMgr->isCurrentSiteSection($this->term);
+  }
+
+  /**
+   * Test if this term is the landing page for current site section.
+   *
+   * For visual reasons section navigation requires distinguishing
+   * between the state of being the closest site section in the
+   * current path's ancestry and also being that section's landing page.
+   *
+   * @return bool
+   *   Bool.
+   */
+  public function isCurrentSiteSectionLandingPage() {
+    return $this->isCurrentSiteSection() && $this->navMgr->isCurrentSiteSectionLandingPage();
   }
 
   /**
