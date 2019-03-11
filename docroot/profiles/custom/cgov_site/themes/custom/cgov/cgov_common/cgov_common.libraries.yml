@@ -3,7 +3,7 @@ global-styling:
   css:
     theme:
       dist/css/Common.css: { preprocess: false }
-      
+
 global-scripts:
   version: 1.x
   js:
@@ -34,6 +34,17 @@ homelanding:
     - core/jquery
     - core/jquery.ui
 
+minilanding:
+  version: 1.x
+  css:
+    theme:
+      dist/css/Minilanding.css: { preprocess: false }
+  js:
+    dist/js/Minilanding.js: { preprocess: false }
+  dependencies:
+    - core/jquery
+    - core/jquery.ui
+
 cancer-centers:
   version: 1.x
   css:
@@ -41,6 +52,14 @@ cancer-centers:
       dist/css/CancerCenters.css: { preprocess: false }
   js:
     dist/js/CancerCenters.js: { preprocess: false }
+
+biography:
+  version: 1.x
+  css:
+    theme:
+      dist/css/Biography.css: { preprocess: false }
+  js:
+    dist/js/Biography.js: { preprocess: false }
 
 blogPost:
   version: 1.x
@@ -52,4 +71,3 @@ blogPost:
   dependencies:
     - core/jquery
     - core/jquery.ui
-    

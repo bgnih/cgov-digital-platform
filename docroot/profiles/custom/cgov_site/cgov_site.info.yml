@@ -35,12 +35,14 @@ install:
   - cgov_core
   - cgov_media
   - cgov_image
+  - cgov_list
   - cgov_article
-  - cgov_blog_post
+  - cgov_blog
   - cgov_home_landing
   - cgov_content_block
   - cgov_press_release
   - cgov_site_section
+  - cgov_video
   - pdq_cancer_information_summary
   - pdq_drug_information_summary
   - cgov_cancer_center
@@ -58,6 +60,8 @@ install:
   # other
   - yaml_content
   - twig_tweak
+  - address
+  - twig_field_value
   - pathauto
   - paragraphs
   - paragraphs_asymmetric_translation_widgets

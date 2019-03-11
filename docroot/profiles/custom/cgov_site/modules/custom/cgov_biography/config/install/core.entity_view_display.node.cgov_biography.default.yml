@@ -10,10 +10,10 @@ dependencies:
     - field.field.node.cgov_biography.field_date_posted
     - field.field.node.cgov_biography.field_date_reviewed
     - field.field.node.cgov_biography.field_date_updated
+    - field.field.node.cgov_biography.field_display_bio_press_info
     - field.field.node.cgov_biography.field_email_address
     - field.field.node.cgov_biography.field_feature_card_description
     - field.field.node.cgov_biography.field_first_name
-    - field.field.node.cgov_biography.field_image_article
     - field.field.node.cgov_biography.field_image_promotional
     - field.field.node.cgov_biography.field_last_name
     - field.field.node.cgov_biography.field_linkedin_handle
@@ -27,6 +27,7 @@ dependencies:
     - field.field.node.cgov_biography.field_phone_number
     - field.field.node.cgov_biography.field_prefix
     - field.field.node.cgov_biography.field_pretty_url
+    - field.field.node.cgov_biography.field_related_resources
     - field.field.node.cgov_biography.field_room_number
     - field.field.node.cgov_biography.field_scientific_publications
     - field.field.node.cgov_biography.field_search_engine_restrictions
@@ -38,6 +39,7 @@ dependencies:
     - node.type.cgov_biography
   module:
     - datetime
+    - entity_reference_revisions
     - options
     - text
     - user
@@ -116,6 +118,13 @@ content:
     third_party_settings: {  }
     type: datetime_default
     region: content
+  field_display_bio_press_info:
+    weight: 36
+    label: above
+    settings: {  }
+    third_party_settings: {  }
+    type: list_default
+    region: content
   field_email_address:
     weight: 29
     label: above
@@ -140,15 +149,6 @@ content:
     third_party_settings: {  }
     type: string
     region: content
-  field_image_article:
-    type: entity_reference_entity_view
-    weight: 9
-    region: content
-    label: hidden
-    settings:
-      view_mode: image_display_article_medium
-      link: false
-    third_party_settings: {  }
   field_image_promotional:
     weight: 10
     label: hidden
@@ -253,6 +253,15 @@ content:
     third_party_settings: {  }
     type: string
     region: content
+  field_related_resources:
+    type: entity_reference_revisions_entity_view
+    weight: 35
+    region: content
+    label: hidden
+    settings:
+      view_mode: default
+      link: ''
+    third_party_settings: {  }
   field_room_number:
     weight: 27
     label: above

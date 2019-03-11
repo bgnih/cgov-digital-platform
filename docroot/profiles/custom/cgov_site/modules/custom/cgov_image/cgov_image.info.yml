@@ -6,8 +6,10 @@ core: 8.x
 dependencies:
   - cgov_media
   - entity_browser
+  - image_widget_crop
   - media
   - image
+  - paragraphs
   - content_moderation
   - language
   - content_translation
